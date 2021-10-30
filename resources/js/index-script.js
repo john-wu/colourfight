@@ -1,5 +1,5 @@
 let client_id = null;
-let websocket = new WebSocket("ws://localhost:9090");
+let websocket = new WebSocket("ws://15.222.5.9:9090");
 websocket.onmessage = message => {
     // message to server data
     const response = JSON.parse(message.data);
