@@ -10,15 +10,20 @@ const root_dir = path.join(__dirname, "../");
 app = express()
 app.use(express.static(root_dir))
 app.get("/", (req,res) => res.sendFile(root_dir + "views/index.html"));
-app.listen(9091, () => console.log("Listening on port 9091..."));
+app.listen(80, () => console.log("Listening on port 80 to serve html..."));
 
 // create server and listen for requests
 const http_server = http.createServer();
-http_server.listen(9090, () => console.log("Listening on port 9090..."));
+http_server.listen(8080, () => console.log("Listening on port 8080 for client requests..."));
 
 // declare game data objects
 const clients = {};
 const games = {};
+const player_colours = {
+    "0": "Red",
+    "1": "Green",
+    "2": "Blue"
+};
 
 const websocket_server = new ws_server({
     "httpServer": http_server
@@ -31,15 +36,16 @@ websocket_server.on("request", request => {
     connection.on("close", () => console.log("Connection closed!"));
     connection.on("message", message => {
         // message received
-        const result = JSON.parse(message.utf8Data);
+        const response = JSON.parse(message.utf8Data);
         
         // user wants to create new game
-        if (result.method === "create") {
-            const client_id = result.client_id;
+        if (response.method === "create") {
+            const client_id = response.client_id;
             const game_id = uuidv4();
             games[game_id] = {
                 "id": game_id,
-                "balls": 20
+                "balls": 20,
+                "clients": []
             };
 
             const payload = {
@@ -50,6 +56,38 @@ websocket_server.on("request", request => {
             const con = clients[client_id].connection;
             con.send(JSON.stringify(payload));
         };
+
+        // user wants to join existing game
+        if (response.method === "join") {
+            const client_id = response.client_id;
+            const game_id = response.game_id;
+            let player_name = response.player_name;
+            const game = games[game_id];
+
+            if (game.clients.length >= 3) {
+                // max players
+                return;
+            }
+
+            const player_colour = player_colours[game.clients.length]
+            if (player_name === "")
+                player_name = player_colour;
+            game.clients.push({
+                "client_id": client_id,
+                "player_colour": player_colour,
+                "player_name": player_name
+            })
+
+            const payload = {
+                "method": "join",
+                "game": game
+            }
+
+            // notify existing players
+            game.clients.forEach(client => {
+                clients[client.client_id].connection.send(JSON.stringify(payload));
+            });
+        }
     });
 
     // generate a new client_id
