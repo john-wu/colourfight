@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>trivia cracked</title>
-    <meta name="description" content="Multiplayer space invaders" />
+    <meta name="description" content="lmao game" />
     <link
       id="favicon"
       rel="icon"
@@ -13,10 +13,16 @@
     <!-- link to stylesheet -->
     <link rel="stylesheet" href="resources/css/style.css">
     <!-- link to the script -->
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
     <script src="resources/js/index-script.js" defer></script>
   </head>
-  <body class="index-body">
+  <body>
     <h1>Trivia Cracked</h1>
-    <button class="create_game_button">New Game</button>
+    <button id="create_game_button">New Game</button>
+    <button id="join_game_button">Join Game</button>
+    <p>Game ID:</p><input type="text" id="game_id_input">
+    <p>Player Name:</p><input type="text" id="player_name_input">
+    <div id="players_list"></div>
+    <div id="game_board"></div>
   </body>
 </html>
