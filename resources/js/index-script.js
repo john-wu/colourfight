@@ -18,7 +18,7 @@ const game_board = document.getElementById("game_board");
 create_game_button.addEventListener("click", create_game);
 join_game_button.addEventListener("click", join_game);
 
-let websocket = new WebSocket("ws://localhost:8080");
+let websocket = new WebSocket("ws:www.jozwu.com:8080");
 websocket.onmessage = message => {
     // received server message
     const response = JSON.parse(message.data);
