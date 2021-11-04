@@ -3,6 +3,7 @@ const http = require("http");
 const { v4: uuidv4 } = require('uuid');
 const express = require("express");
 const ws_server = require("websocket").server;
+const { response } = require("express");
 
 const root_dir = path.join(__dirname, "../");
 
@@ -20,9 +21,9 @@ http_server.listen(8080, () => console.log("Listening on port 8080 for client re
 const clients = {};
 const games = {};
 const player_colours = {
-    "0": "Red",
-    "1": "Green",
-    "2": "Blue"
+    "0": "red",
+    "1": "green",
+    "2": "yellow"
 };
 
 const websocket_server = new ws_server({
@@ -45,7 +46,8 @@ websocket_server.on("request", request => {
             games[game_id] = {
                 "id": game_id,
                 "balls": 20,
-                "clients": []
+                "clients": {},
+                "state": {}
             };
 
             const payload = {
@@ -64,19 +66,27 @@ websocket_server.on("request", request => {
             let player_name = response.player_name;
             const game = games[game_id];
 
-            if (game.clients.length >= 3) {
+            if (!game) {
+                return;
+            }
+            if (Object.keys(game.clients).length >= 3) {
                 // max players
                 return;
             }
 
-            const player_colour = player_colours[game.clients.length]
+            const player_colour = player_colours[Object.keys(game.clients).length]
             if (player_name === "")
                 player_name = player_colour;
-            game.clients.push({
-                "client_id": client_id,
+            game.clients[client_id] = {
                 "player_colour": player_colour,
                 "player_name": player_name
-            })
+            };
+            
+            // start game once 3 players reached
+            if (Object.keys(game.clients).length === 3) {
+                start_game(game);
+                update_game_state();
+            }
 
             const payload = {
                 "method": "join",
@@ -84,10 +94,22 @@ websocket_server.on("request", request => {
             }
 
             // notify existing players
-            game.clients.forEach(client => {
-                clients[client.client_id].connection.send(JSON.stringify(payload));
-            });
-        }
+            for (const client_id of Object.keys(game.clients)) {
+                clients[client_id].connection.send(JSON.stringify(payload));
+            };
+        };
+
+        // user wants to play
+        if (response.method === "play") {
+            const client_id = response.client_id;
+            const game_id = response.game_id;
+            const ball_id = response.ball_id;
+            const game = games[game_id];
+            let state = game.state;
+
+            state[ball_id] = game.clients[client_id];
+            games[game_id].state = state;
+        };
     });
 
     // generate a new client_id
@@ -99,9 +121,51 @@ websocket_server.on("request", request => {
     const payload = {
         "method": "connect",
         "client_id": client_id
-    }
+    };
 
     // send back client connect message
-    connection.send(JSON.stringify(payload))
+    connection.send(JSON.stringify(payload));
+});
 
-})
+function start_game(game) {
+    // send start game request to all clients in game
+    const payload = {
+        "method": "start_game"          
+    };
+
+    for (const client_id of Object.keys(game.clients)) {
+        clients[client_id].connection.send(JSON.stringify(payload));
+    };
+};
+
+function update_game_state() {
+    // send updated game state to each client for each game
+    // {"game_id": "xxxxxxx"}
+    for (const g of Object.keys(games)) {
+        const game = games[g];
+
+        // calculate total scores
+        const scores = {};
+        for (const client_id of Object.keys(game.clients)) {
+            scores[game.clients[client_id].player_name] = 0; 
+        };
+
+        const state = game.state;
+        for (const ball_id of Object.keys(state)) {
+            scores[state[ball_id].player_name] += 1
+        }
+
+        const payload = {
+            "method": "update",
+            "game": game,
+            "scores": scores            
+        };
+
+        for (const client_id of Object.keys(game.clients)) {
+            clients[client_id].connection.send(JSON.stringify(payload));
+        };
+    };
+
+    // repeat every 500ms
+    setTimeout(update_game_state, 100);
+}
